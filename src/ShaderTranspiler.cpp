@@ -25,7 +25,7 @@
 #define ST_DXIL_ENABLED
 #endif
 
-#define NEW_DXC (ST_BUNDLED_DXC || _WIN32)
+// #define NEW_DXC (ST_BUNDLED_DXC || _WIN32)
 
 #if NEW_DXC
 	#include <atlcomcli.h>
