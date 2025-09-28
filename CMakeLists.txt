@@ -14,7 +14,7 @@ set(SPIRV_SKIP_EXECUTABLES ON CACHE INTERNAL "")
 set(SPIRV_SKIP_TESTS ON CACHE INTERNAL "")
 set(SPIRV_WERROR OFF CACHE INTERNAL "")
 if(NOT WEBGPU_BACKEND STREQUAL "DAWN") # Reuse the version provided by Dawn, to avoid conflicting
-    add_subdirectory("${ST_DEPS_DIR}/SPIRV-Tools" EXCLUDE_FROM_ALL)
+	add_subdirectory(deps/SPIRV-Tools EXCLUDE_FROM_ALL)
 endif()
 
 set(SKIP_GLSLANG_INSTALL ON CACHE INTERNAL "")
@@ -22,15 +22,18 @@ set(BUILD_EXTERNAL OFF CACHE INTERNAL "")
 set(ENABLE_GLSLANG_BINARIES OFF CACHE INTERNAL "")
 set(ENABLE_CTEST OFF CACHE INTERNAL "")
 set(BUILD_EXTERNAL OFF CACHE INTERNAL "")
-add_subdirectory("${ST_DEPS_DIR}/glslang" EXCLUDE_FROM_ALL)
+set(ENABLE_HLSL OFF CACHE INTERNAL "")
+add_subdirectory(deps/glslang EXCLUDE_FROM_ALL)
 
 set(SPIRV_CROSS_CLI OFF CACHE INTERNAL "")
 set(SPIRV_CROSS_ENABLE_TESTS OFF CACHE INTERNAL "")
 set(SPIRV_CROSS_ENABLE_C_API OFF CACHE INTERNAL "")
 set(SPIRV_CROSS_SKIP_INSTALL ON CACHE INTERNAL "")
-add_subdirectory("${ST_DEPS_DIR}/SPIRV-Cross" EXCLUDE_FROM_ALL)
+add_subdirectory(deps/SPIRV-Cross EXCLUDE_FROM_ALL)
 
-add_subdirectory("${ST_DEPS_DIR}/SPIRV-Reflect" EXCLUDE_FROM_ALL)
+set(SPIRV_REFLECT_EXECUTABLE OFF)
+set(SPIRV_REFLECT_STATIC_LIB ON)
+add_subdirectory(deps/SPIRV-Reflect EXCLUDE_FROM_ALL)
 
 if(ST_ENABLE_WGSL)
     if(NOT WEBGPU_BACKEND STREQUAL "DAWN") # When using Dawn they are set in Cool's CMake. (Because they must be before including Dawn)
@@ -56,7 +59,7 @@ if(ST_ENABLE_WGSL)
         set(TINT_OS_CC_SUFFIX "other")
     endif()
     if(NOT WEBGPU_BACKEND STREQUAL "DAWN") # Reuse the version provided by Dawn, to avoid conflicting
-        add_subdirectory("${ST_DEPS_DIR}/tint/src/tint" EXCLUDE_FROM_ALL)
+    	add_subdirectory(deps/tint/src/tint EXCLUDE_FROM_ALL)
     endif()
     target_include_directories(tint_diagnostic_utils PUBLIC "${ST_DEPS_DIR}/tint")
     target_include_directories(libtint PUBLIC "${ST_DEPS_DIR}/tint/include")
@@ -69,6 +72,20 @@ if(ST_ENABLE_WGSL)
 endif()
 
 if(ST_BUNDLED_DXC)
+# TODO(WebGPU) Cleanup duplicated options?
+	include(deps/DirectXShaderCompiler/cmake/caches/PredefinedParams.cmake)
+	set(LLVM_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+    set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
+    set(CLANG_INCLUDE_TESTS OFF CACHE BOOL "" FORCE) 
+    set(HLSL_INCLUDE_TESTS OFF CACHE BOOL "" FORCE) 
+    set(ENABLE_SPIRV_CODEGEN OFF CACHE BOOL "" FORCE)  
+    set(SPIRV_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+	set(LLVM_TARGETS_TO_BUILD "None" CACHE INTERNAL "" FORCE)
+    set(HLSL_BUILD_DXILCONV OFF CACHE INTERNAL "" FORCE)
+    set(HLSL_DISABLE_SOURCE_GENERATION ON CACHE BOOL "" FORCE)
+    set(LLVM_OPTIMIZED_TABLEGEN OFF CACHE BOOL "" FORCE)
+    add_subdirectory(deps/DirectXShaderCompiler/projects/include/Tracing EXCLUDE_FROM_ALL) # needed for an ETW
+    add_subdirectory(deps/DirectXShaderCompiler EXCLUDE_FROM_ALL)
     set(CMAKE_EXPORT_COMPILE_COMMANDS ON CACHE BOOL "")
     set(LLVM_APPEND_VC_REV ON CACHE BOOL "")
     set(LLVM_DEFAULT_TARGET_TRIPLE "dxil-ms-dx" CACHE STRING "")
@@ -97,11 +114,14 @@ if(ST_BUNDLED_DXC)
     add_subdirectory("${ST_DEPS_DIR}/DirectXShaderCompiler" EXCLUDE_FROM_ALL)
     set(DXCLIBS "dxcompiler")
     set(ST_DXC_EXE_PATH "$<TARGET_FILE:dxc>" CACHE INTERNAL "")
+    set_target_properties(dxcompiler 
+        PROPERTIES
+        DEBUG_POSTFIX ""
+    )
+    add_dependencies(dxcompiler dxildll)
+    set_target_properties(dxildll PROPERTIES DEBUG_POSTFIX "")
 else()
     set(DXCLIBS "dxcompiler.lib")
-    if(WINDOWS_STORE)
-        set(DXCLIBS "") # can't use it on UWP
-    endif()
     set(ST_DXC_EXE_PATH "dxc.exe" CACHE INTERNAL "")
 endif()
 
@@ -137,7 +157,7 @@ target_link_libraries("${PROJECT_NAME}" PRIVATE
     spirv-cross-msl
     spirv-cross-reflect
     SPIRV-Tools
-    SPIRV-Reflect
+    spirv-reflect-static
     ${TINT_LIB}
     ${FOUNDATION_LIB}
 )
